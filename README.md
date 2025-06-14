@@ -13,9 +13,9 @@ Generate signals with custom waveforms and transmit them via the default output 
 9. Play signal from file
 
 # Customization
-Both AM and FM modulation
-Both up and down chirps
-Both linear and logarithmic scales
-Lowpass, highpass, and bandpass filtering
-Writing signals to WAV files
-Preamble signal before transmission
+- Both AM and FM modulation
+- Both up and down chirps
+- Both linear and logarithmic scales
+- Lowpass, highpass, and bandpass filtering
+- Writing signals to WAV files
+- Preamble signal before transmission
