@@ -7,6 +7,7 @@ import numpy as np
 import scipy as sci
 import sounddevice as sd
 import soundfile as sf
+import sys
 import time
 from datetime import datetime
 from tkinter import filedialog
@@ -20,8 +21,8 @@ pulseRate        = 1          # delay between pulses [sec]
 reps             = 2          # number of pulses [count]
 pw               = 1.0        # pulse width [sec]
 nPCW             = 5          # number of pulses in each train [count]
-lowcut           = 2000       # filter low cutoff frequency [Hz]
-highcut          = 10000      # filter high cutoff frequency [Hz]
+lowcut           = 500        # filter low cutoff frequency [Hz]
+highcut          = 20000      # filter high cutoff frequency [Hz]
 filterFlag       = 'bandpass' # select lowpass, highpass, or bandpass filtering
 modulation_index = 0.5        # modulation index (controls the depth of modulation)
 fc               = 150        # modulation carrier frequency [Hz]
@@ -43,71 +44,94 @@ freqTone3        = 2000       # frequency [Hz] of the third tone
 t = np.linspace(0, pw, int(fs * pw), endpoint=False) # samples [count]
 
 # receive user input
-signalSelect = input("1. Pulsed CW\n"
-                    "2. Stepped CW\n"
-                    "3. Chirp\n"
-                    "4. Chirp with random noise\n"
-                    "5. Random noise\n"
-                    "6. Random noise with scaled CWs\n"
-                    "7. Modulated signal\n"
-                    "8. Record mic input and output it\n"
-                    "9. Play signal from file\n"
-                    "Enter the number of your desired signal: ")
+signalSelect = input("1. Pulsed Continuous Wave\n"
+                     "2. Stepped Continuous Wave\n"
+                     "3. Chirp\n"
+                     "4. Chirp with broadband noise\n"
+                     "5. Broadband Noise\n"
+                     "6. Broadband Noise with Tones\n"
+                     "7. Modulated signal\n"
+                     "8. Record mic input and output it\n"
+                     "9. Play signal from file\n"
+                     "Enter the number of your desired signal: ")
 
 # function save the audio data to a .wav file
 def saveSignalToFile(signal,signalType):
-        # get the current date and time
-        current_datetime = datetime.now()
+    # get the current date and time
+    current_datetime = datetime.now()
 
-        # format the time as YYYY-mm-dd_HHMMSS
-        current_time = current_datetime.strftime("%Y-%m-%d_%H%M%S")
-        
-        # save the audio data 
-        output_filename = current_time + "_" + signalType + ".wav"
-        sci.io.wavfile.write(output_filename, fs, signal)
+    # format the time as YYYY-mm-dd_HHMMSS
+    current_time = current_datetime.strftime("%Y-%m-%d_%H%M%S")
+    
+    # save the audio data 
+    output_filename = current_time + "_" + signalType + ".wav"
+    sci.io.wavfile.write(output_filename, fs, signal)
 
-# preamble signal
-if preambleFlag == 'on':
-    # set up signal
-    signal = np.sin(2*np.pi*preambleFreq*t)            # sine wave of specified signal
+def processSignal(signal):
     window = sci.signal.windows.tukey(len(signal), .1) # Tukey windowing
     signal = window * signal                           # refactor with Tukey windowing
-    signal = signal / max(signal)                      # normalize signal
-   
-    # save the audio data to a .wav file
-    if recordFlag == 'on':
-        signalType = "pulsed_cw_signal"
-        saveSignalToFile(signal,signalType)
+    signal = signal / max(signal)                      # normalize signal  
 
-    # output signal
-    print(f'Transmitting preamble pulse at {preambleFreq:.2f} Hz')
-    sd.play(signal,fs)    # play the signal
-    sd.wait()             # wait while the signal plays
-    sd.stop()             # stop the signal
-    time.sleep(pulseRate) # wait before transmitting the next signal
-
-# pulsed continuous wave (PCW)
-if signalSelect == '1':
-    # set up signal
-    signal = np.sin(2 * np.pi * freq * t)              # sine wave of specified signal
-    window = sci.signal.windows.tukey(len(signal), .1) # Tukey windowing
-    signal = window * signal                           # refactor with Tukey windowing
-    signal = signal / max(signal)                      # normalize signal
-
-    # output signal
-    for i in range(reps):
+def transmit(signal,signalType):
+    for i in range(reps):        
         # save the audio data to a .wav file
         if recordFlag == 'on':
-            signalType = "pulsed_cw_signal"
-            saveSignalToFile(signal,signalType)
+            saveSignalToFile(signal,signalType)     
 
-        print(f'Transmitting pulse {1 + i:d} of {reps:d} at {freq:.2f} Hz')
+        if signalType == "preamble_signal":
+            print(f'Transmitting preamble pulse at {preambleFreq:.2f} Hz')
+        elif signalType == "pulsed_cw_signal":
+            print(f'Transmitting pulse {1 + i:d} of {reps:d} at {freq:.2f} Hz')
+        elif signalType == "stepped_cw_signal":
+            print(f'Transmitting pulse {1 + i:d} of {len(freq):d} at {freq[i]:.2f} Hz')
+        elif signalType == "chirp_signal":
+            print(f'Transmitting chirp {1 + i:d} of {reps:d}')
+        elif signalType == "chirp_with_broadband_noise_signal":
+            print(f'Transmitting chirp {1 + i:d} of {reps:d}')
+        elif signalType == "broadband_noise_signal":
+            print(f'Transmitting pulse {1 + i:d} of {reps:d}')
+        elif signalType == "broadband_noise_with_tones_signal":
+            print(f'Transmitting pulse {1 + i:d} of {reps:d}')
+        elif signalType == "modulated_signal":
+            print(f'Transmitting pulse {1 + i:d} of {reps:d}')
+        elif signalType == "microphone_signal":
+            print(f'Transmitting recorded signal {1 + i:d} of {reps:d}')
+        elif signalType == "imported_signal":
+            print(f'Transmitting imported signal {1 + i:d} of {reps:d}')
+        else:
+            sys.exit('Signal selection not valid.')
+
+        # print(f'Transmitting pulse {1 + i:d} of {reps:d} at {freq:.2f} Hz')
         sd.play(signal,fs)    # play the signal
         sd.wait()             # wait while the signal plays
         sd.stop()             # stop the signal
         time.sleep(pulseRate) # wait before transmitting the next signal
 
-# stepped continuous wave (stepped CW)
+# preamble signal
+if preambleFlag == 'on':
+    # set up signal
+    signal = np.sin(2*np.pi*preambleFreq*t) # sine wave of specified signal
+    
+    # process signal
+    processSignal(signal)
+    
+    # output signal
+    signalType = "preamble_signal"
+    transmit(signal,signalType)
+
+# Pulsed Continuous Wave (PCW)
+if signalSelect == '1':
+    # set up signal
+    signal = np.sin(2 * np.pi * freq * t)  # sine wave of specified signal
+    
+    # process signal
+    processSignal(signal)
+    
+    # output signal
+    signalType = "pulsed_cw_signal"
+    transmit(signal,signalType)
+
+# Stepped Continuous Wave (stepped CW)
 elif signalSelect == '2':
     # apply log or linear scaling
     if logScaleFlag == 'log': # use log scale
@@ -122,10 +146,10 @@ elif signalSelect == '2':
 
     # set up the pulse train
     for i in range(len(freq)):
-        signal = np.sin(2 * np.pi * freq[i] * t)                 # sine wave of specified signal
-        window = sci.signal.windows.tukey(len(signal), .1) # Tukey windowing
-        signal = window * signal                           # refactor with Tukey windowing
-        signal = signal / max(signal)                      # normalize signal
+        signal = np.sin(2 * np.pi * freq[i] * t) # sine wave of specified signal
+        
+        # process signal
+        processSignal(signal)
 
         # save the audio data to a .wav file
         if recordFlag == 'on':
@@ -139,7 +163,7 @@ elif signalSelect == '2':
         sd.stop()             # stop the signal
         time.sleep(pulseRate) # wait before transmitting the next signal
 
-# frequency sweep (or chirp)
+# Chirp
 elif signalSelect == '3':
     # apply chirp direction
     if chirpDirection == 'down': # use log scale
@@ -153,25 +177,14 @@ elif signalSelect == '3':
     else: # use linear scale
         signal = sci.signal.chirp(t,freqStart,t[-1],freqEnd,'linear',phi=-90) # swept-frequency cosine
 
-    # signal processing
-    window = sci.signal.windows.tukey(len(signal), .1) # Tukey windowing
-    signal = window * signal                           # refactor with Tukey windowing
-    signal = signal / max(signal)                      # normalize signal
+    # process signal
+    processSignal(signal)
 
     # output signal
-    for i in range(reps):
-        # save the audio data to a .wav file
-        if recordFlag == 'on':
-            signalType = "chirp_signal"
-            saveSignalToFile(signal,signalType)
+    signalType = "chirp_signal"
+    transmit(signal,signalType)
 
-        print(f'Transmitting pulse {1 + i:d} of {reps:d}')
-        sd.play(signal,fs)    # play the signal
-        sd.wait()             # wait while the signal plays
-        sd.stop()             # stop the signal
-        time.sleep(pulseRate) # wait before transmitting the next signal
-
-# frequency sweep (or chirp) with random noise
+# Chirp with broadband noise
 elif signalSelect == '4':
     # apply chirp direction
     if chirpDirection == 'down': # use log scale
@@ -186,30 +199,19 @@ elif signalSelect == '4':
         signal = sci.signal.chirp(t,freqStart,t[-1],freqEnd,'linear',phi=-90) # swept-frequency cosine
     
     # random noise signal
-    randSignal = np.random.randn(len(t))      # normally distributed random noise
-    randSignal = randSignal / max(randSignal) # normalize signal
-    randSignal = randGain * randSignal        # scaled signal
+    randSignal = np.random.randn(len(t))           # normally distributed random noise
+    randSignal = randSignal / max(abs(randSignal)) # normalize signal
+    randSignal = randGain * randSignal             # scaled signal
+    signal     = randSignal + signal               # composite signal
 
-    # signal processing
-    signal = randSignal + signal                       # composite signal
-    window = sci.signal.windows.tukey(len(signal), .1) # Tukey windowing
-    signal = window * signal                           # refactor with Tukey windowing
-    signal = signal / max(signal)                      # normalize signal
+    # process signal
+    processSignal(signal)
 
     # output signal
-    for i in range(reps):
-        # save the audio data to a .wav file
-        if recordFlag == 'on':
-            signalType = "chirp_with_random_noise_signal"
-            saveSignalToFile(signal,signalType)
+    signalType = "chirp_with_broadband_noise_signal"
+    transmit(signal,signalType)
 
-        print(f'Transmitting pulse {1 + i:d} of {reps:d}')
-        sd.play(signal,fs)    # play the signal
-        sd.wait()             # wait while the signal plays
-        sd.stop()             # stop the signal
-        time.sleep(pulseRate) # wait before transmitting the next signal
-
-# random noise
+# Broadband Noise
 elif signalSelect == '5':
     # set the order for the Butterworth filter
     order = 4  # Filter order
@@ -233,56 +235,34 @@ elif signalSelect == '5':
         b, a = sci.signal.butter(order, [lowcut_norm, highcut_norm], btype='band')
         signal = sci.signal.filtfilt(b, a, signal)
     
-    # signal processing
-    window = sci.signal.windows.tukey(len(signal), .1) # Tukey windowing
-    signal = window * signal                           # refactor with Tukey windowing
-    signal = signal / max(signal)                      # normalize signal
+    # process signal
+    processSignal(signal)
     
     # output signal
-    for i in range(reps):
-        # save the audio data to a .wav file
-        if recordFlag == 'on':
-            signalType = "random_noise_signal"
-            saveSignalToFile(signal,signalType)
+    signalType = "broadband_noise_signal"
+    transmit(signal,signalType)
 
-        print(f'Transmitting pulse {1 + i:d} of {reps:d}')
-        sd.play(signal,fs)    # play the signal
-        sd.wait()             # wait while the signal plays
-        sd.stop()             # stop the signal
-        time.sleep(pulseRate) # wait before transmitting the next signal
-
-# random noise with CW
+# Broadband Noise with Tones
 elif signalSelect == '6':
     # random noise signal
-    randSignal = np.random.randn(len(t))      # normally distributed random noise
-    randSignal = randSignal / max(randSignal) # normalize signal
-    randSignal = randGain * randSignal        # scaled signal
+    randSignal = np.random.randn(len(t))           # normally distributed random noise
+    randSignal = randSignal / max(abs(randSignal)) # normalize signal
+    randSignal = randGain * randSignal             # scaled signal
 
     # CW signals
-    cw1 = freqGain1 * np.sin(2 * np.pi * freqTone1 * t) # sine wave of specified signal
-    cw2 = freqGain2 * np.sin(2 * np.pi * freqTone2 * t) # sine wave of specified signal
-    cw3 = freqGain3 * np.sin(2 * np.pi * freqTone3 * t) # sine wave of specified signal
+    cw1    = freqGain1 * np.sin(2 * np.pi * freqTone1 * t) # sine wave of specified signal
+    cw2    = freqGain2 * np.sin(2 * np.pi * freqTone2 * t) # sine wave of specified signal
+    cw3    = freqGain3 * np.sin(2 * np.pi * freqTone3 * t) # sine wave of specified signal
+    signal = randSignal + cw1 + cw2 + cw3                  # composite signal
 
-    # signal processing
-    signal = randSignal + cw1 + cw2 + cw3              # composite signal
-    window = sci.signal.windows.tukey(len(signal), .1) # Tukey windowing
-    signal = window * signal                           # refactor with Tukey windowing
-    signal = signal / max(signal)                      # normalize signal
+    # process signal
+    processSignal(signal)
     
     # output signal
-    for i in range(reps):
-        # save the audio data to a .wav file
-        if recordFlag == 'on':
-            signalType = "random_noise_with_cw_signal"
-            saveSignalToFile(signal,signalType)
+    signalType = "broadband_noise_with_tones_signal"
+    transmit(signal,signalType)
 
-        print(f'Transmitting pulse {1 + i:d} of {reps:d}')
-        sd.play(signal,fs)    # play the signal
-        sd.wait()             # wait while the signal plays
-        sd.stop()             # stop the signal
-        time.sleep(pulseRate) # wait before transmitting the next signal
-
-# modulated signal
+# Modulated Signal
 elif signalSelect == '7':
     # apply chirp direction
     if chirpDirection == 'down': # use log scale
@@ -298,23 +278,12 @@ elif signalSelect == '7':
         freq   = np.linspace(freqStart,freqEnd,len(t))
         signal = np.sin(2 * np.pi * freq * t)
     
-    # signal processing
-    window = sci.signal.windows.tukey(len(signal), .1) # Tukey windowing
-    signal = window * signal                           # refactor with Tukey windowing
-    signal = signal / max(signal)                      # normalize signal
+    # process signal
+    processSignal(signal)
 
     # output signal
-    for i in range(reps):
-        # save the audio data to a .wav file
-        if recordFlag == 'on':
-            signalType = "modulated_cw_signal"
-            saveSignalToFile(signal,signalType)
-
-        print(f'Transmitting pulse {1 + i:d} of {reps:d}')
-        sd.play(signal,fs)    # play the signal
-        sd.wait()             # wait while the signal plays
-        sd.stop()             # stop the signal
-        time.sleep(pulseRate) # wait before transmitting the next signal
+    signalType = "modulated_signal"
+    transmit(signal,signalType)
 
 # record microphone input and output it
 elif signalSelect == '8':
@@ -333,41 +302,32 @@ elif signalSelect == '8':
     # apply amplitude modulation (AM)
     signal = (1 + modulation_index * recSignal.flatten()) * carrierSignal
 
-    # ensure the modulated signal is between -1 and 1 to avoid clipping
-    signal = np.clip(signal, -1, 1)
-
-    # save the audio data to a .wav file
-    if recordFlag == 'on':
-        signalType = "microphone_signal"
-        saveSignalToFile(signal,signalType)
+    # process signal
+    processSignal(signal)
 
     # output signal
-    print("Playing back the modulated audio...")
-    sd.play(signal,fs)  # play the signal
-    sd.wait()           # wait while the signal plays
-    sd.stop()           # stop the signal
-    print("Playback complete.")
+    signalType = "microphone_signal"
+    transmit(signal,signalType)
 
 # play signal from file
 elif signalSelect == '9':
-    # open file selection dialog box
-    file_path = filedialog.askopenfilename()
+    # use try/except to handle errors from file selection
+    try:
+        # open file selection dialog box
+        file_path = filedialog.askopenfilename()
 
-    # import signal file
-    signal, fs = sf.read(file_path)
+        # import signal file
+        signal, fs = sf.read(file_path)
 
-    # output signal
-    for i in range(reps):
-        # save the audio data to a .wav file
-        if recordFlag == 'on':
-            signalType = "imported_signal"
-            saveSignalToFile(signal,signalType)
+        # output signal
+        signalType = "imported_signal"
+        transmit(signal,signalType)
+    except:
+        sys.exit('Unsupported file selected, or no file selected.')
 
-        print(f'Transmitting pulse {1 + i:d} of {reps:d}')
-        sd.play(signal,fs)    # play the signal
-        sd.wait()             # wait while the signal plays
-        sd.stop()             # stop the signal
-        time.sleep(pulseRate) # wait before transmitting the next signal
+# abort execution of the script if signal selection is invalid 
+else:
+    sys.exit('Signal selection not valid.')
 
 # plot frequency domain data
 plt.subplot(121)
